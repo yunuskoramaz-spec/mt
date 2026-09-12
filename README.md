@@ -16,6 +16,7 @@ Kayseri ve Erciyes temalı native Android arcade oyunu.
 - Boru, HUD, menü ve oyun sonu kartları yeniden tasarlandı.
 - Alt zemin oyun alanının yalnızca son bölümünü kaplar.
 - Erciyes, Kayseri şehir silüeti, kubbe/minare ve bulutlar sade katmanlar halinde çizilir.
+- Karakter PNG'si geçerli RGBA asset olarak yenilendi; şeffaflık ve tam görüntü doğrulandı.
 
 ## Oynanış
 - Ana menüden Oyuna Başla seçilir.
