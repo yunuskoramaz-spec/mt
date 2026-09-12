@@ -1,0 +1,80 @@
+name: Visual Debug
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  visual-debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+      - name: Build APK
+        run: gradle --no-daemon clean assembleDebug
+      - name: Capture runtime diagnostics
+        id: emulator
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: Pixel_2
+          force-avd-creation: true
+          wipe-data: true
+          disable-animations: true
+          emulator-options: -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
+          script: |
+            mkdir -p visual-debug
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n com.q3rvo.erciyesflight/.MainActivity
+            sleep 3
+            adb shell screencap -p /sdcard/menu.png
+            adb pull /sdcard/menu.png visual-debug/01-menu.png
+            adb shell input tap 540 1100
+            sleep 0.5
+            adb shell screencap -p /sdcard/game.png
+            adb pull /sdcard/game.png visual-debug/02-game.png
+            adb shell input tap 540 1100
+            sleep 0.3
+            adb shell screencap -p /sdcard/bird.png
+            adb pull /sdcard/bird.png visual-debug/03-bird.png
+            for i in $(seq 1 10); do adb shell input tap 540 1100; sleep 0.32; done
+            adb shell screencap -p /sdcard/early.png
+            adb pull /sdcard/early.png visual-debug/04-early.png
+            for i in $(seq 1 15); do adb shell input tap 540 1100; sleep 0.32; done
+            adb shell screencap -p /sdcard/late.png
+            adb pull /sdcard/late.png visual-debug/05-late.png
+            sleep 3
+            adb shell screencap -p /sdcard/over.png
+            adb pull /sdcard/over.png visual-debug/06-game-over.png
+            adb shell input tap 540 1140
+            sleep 0.5
+            adb shell screencap -p /sdcard/replay.png
+            adb pull /sdcard/replay.png visual-debug/07-replay.png
+            adb shell input tap 540 1235
+            sleep 0.4
+            adb shell input tap 540 1410
+            sleep 0.4
+            adb shell screencap -p /sdcard/settings.png
+            adb pull /sdcard/settings.png visual-debug/08-settings.png
+            adb logcat -d > visual-debug/logcat.txt
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: erciyes-ucusu-visual-debug
+          path: visual-debug
+          if-no-files-found: warn
