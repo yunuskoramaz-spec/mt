@@ -44,7 +44,7 @@ class PipeSpawner(
 
         // At most one spawn per physics update. The next obstacle is always
         // placed at a fixed distance from the rightmost active obstacle.
-        val lastPipe = pipes.maxByOrNull { it.x }
+        val lastPipe = pipes.lastOrNull()
         if (lastPipe == null || lastPipe.x < 1080f - spawnTriggerDistance) {
             val nextX = if (lastPipe == null) 1080f + spacing else lastPipe.x + spacing
             val gapCenter = if (spawnCount < 3) {
@@ -70,11 +70,10 @@ class PipeSpawner(
     private fun enforceInvariants() {
         require(pipes.isNotEmpty())
         require(pipes.none { it.x.isNaN() || it.x.isInfinite() })
-        val sorted = pipes.sortedBy { it.x }
-        for (i in 1 until sorted.size) {
-            val distance = sorted[i].x - sorted[i - 1].x
+        for (i in 1 until pipes.size) {
+            val distance = pipes[i].x - pipes[i - 1].x
             require(kotlin.math.abs(distance - spacing) <= 0.01f) { "Pipe spacing violated: $distance" }
         }
-        require(sorted.last().x > 1080f - spacing - 1f)
+        require(pipes.last().x > 1080f - spacing - 1f)
     }
 }
