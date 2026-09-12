@@ -1,4 +1,4 @@
-name: Final Visual Validation
+name: Ada Kuşum Final Visual Validation
 
 on:
   workflow_dispatch:
@@ -21,11 +21,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
-      - name: Unit tests and APK build
+      - name: Ada Kuşum unit tests and APK build
         run: |
           gradle --no-daemon testDebugUnitTest
           gradle --no-daemon clean assembleDebug
-      - name: Capture and verify eight screenshots
+      - name: Capture and verify eight Ada Kuşum screenshots
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -66,10 +66,10 @@ jobs:
             adb shell screencap -p /sdcard/08.png && adb pull /sdcard/08.png "$OUT/08-settings.png"
             test "$(find "$OUT" -maxdepth 1 -name '*.png' | wc -l)" -eq 8
             ls -lh "$OUT"
-      - name: Upload screenshots and APK
+      - name: Upload Ada Kuşum screenshots and APK
         uses: actions/upload-artifact@v4
         with:
-          name: erciyes-ucusu-final-visual-validation
+          name: ada-kusum-final-visual-validation
           path: |
             visual-validation/*.png
             app/build/outputs/apk/debug/app-debug.apk
