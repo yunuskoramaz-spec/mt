@@ -2,144 +2,44 @@ package com.q3rvo.erciyesflight
 
 import android.content.Context
 import android.graphics.*
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.view.MotionEvent
 import android.view.View
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
 
 class GameView(context: Context) : View(context) {
-    private val bg = BitmapFactory.decodeStream(context.assets.open("background.png"))
-    private val bird = BitmapFactory.decodeStream(context.assets.open("bird.png"))
+    private val bird = BitmapFactory.decodeResource(resources, R.drawable.player_bird)
     private val prefs = context.getSharedPreferences("game", Context.MODE_PRIVATE)
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 70)
     private var high = prefs.getInt("high", 0)
+    private var muted = prefs.getBoolean("muted", false)
     private var state = State.MENU
     private var score = 0
-    private var y = 0f
-    private var vy = 0f
-    private var spawn = 0f
-    private var lastNs = System.nanoTime()
-    private var muted = false
+    private var birdY = 0f
+    private var velocity = 0f
+    private var spawnTimer = 0f
+    private var lastTimeNs = System.nanoTime()
+    private var newRecordShown = false
     private val pipes = mutableListOf<Pipe>()
-
     private enum class State { MENU, PLAYING, GAMEOVER }
     private data class Pipe(var x: Float, val gapY: Float, var passed: Boolean = false)
-
-    override fun onDraw(canvas: Canvas) {
-        val dt = min((System.nanoTime() - lastNs) / 1_000_000_000f, 0.033f)
-        lastNs = System.nanoTime()
-        drawBackground(canvas)
-        when (state) {
-            State.MENU -> drawMenu(canvas)
-            State.PLAYING -> { update(dt); drawGame(canvas) }
-            State.GAMEOVER -> { drawGame(canvas); drawGameOver(canvas) }
-        }
-        postInvalidateOnAnimation()
-    }
-
-    private fun drawBackground(c: Canvas) {
-        c.drawBitmap(bg, null, Rect(0, 0, width, height), paint)
-        paint.color = Color.argb(45, 255, 255, 255)
-        c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
-    }
-
-    private fun drawMenu(c: Canvas) {
-        val w = width.toFloat(); val h = height.toFloat()
-        paint.color = Color.argb(150, 0, 0, 0); c.drawRect(0f, 0f, w, h, paint)
-        text(c, "ERCİYES UÇUŞU", w/2, h*.22f, h*.075f, true)
-        text(c, "Kayseri'nin üzerinde ne kadar uçabilirsin?", w/2, h*.29f, h*.031f, false)
-        button(c, h*.48f, h*.60f, "OYUNA BAŞLA")
-        button(c, h*.64f, h*.74f, if (muted) "🔇 SES KAPALI" else "🔊 SES AÇIK")
-        text(c, "EN YÜKSEK SKOR  $high", w/2, h*.84f, h*.031f, true)
-    }
-
-    private fun button(c: Canvas, top: Float, bottom: Float, label: String) {
-        val w = width.toFloat(); val l = w*.2f; val r = w*.8f
-        paint.color = Color.rgb(255, 193, 7); c.drawRoundRect(l, top, r, bottom, 28f, 28f, paint)
-        paint.color = Color.WHITE; paint.style = Paint.Style.STROKE; paint.strokeWidth = 4f
-        c.drawRoundRect(l, top, r, bottom, 28f, 28f, paint); paint.style = Paint.Style.FILL
-        text(c, label, w/2, (top+bottom)/2 + 11f, (bottom-top)*.34f, true)
-    }
-
-    private fun text(c: Canvas, s: String, x: Float, y: Float, size: Float, bold: Boolean) {
-        paint.color = Color.WHITE; paint.textAlign = Paint.Align.CENTER; paint.textSize = size
-        paint.typeface = Typeface.create(Typeface.DEFAULT, if (bold) Typeface.BOLD else Typeface.NORMAL)
-        c.drawText(s, x, y, paint)
-    }
-
-    private fun update(dt: Float) {
-        val w = width.toFloat(); val h = height.toFloat()
-        vy += h*1.25f*dt; y += vy*dt
-        spawn -= dt
-        if (spawn <= 0f) {
-            spawn = 1.45f
-            val minY = h*.23f; val maxY = h*.61f
-            pipes += Pipe(w+80f, Random.nextFloat()*(maxY-minY)+minY)
-        }
-        val speed = w*.42f + score*w*.006f
-        pipes.forEach { p ->
-            p.x -= speed*dt
-            if (!p.passed && p.x < w*.18f) { p.passed = true; score++; saveHigh() }
-        }
-        pipes.removeAll { it.x < -140f }
-
-        val bw = w*.18f; val bh = h*.10f
-        val bx = w*.19f
-        val br = RectF(bx-bw/2, y-bh/2, bx+bw/2, y+bh/2)
-        if (y < h*.035f || y > h*.82f || pipes.any { p ->
-                val gap = h*.135f
-                RectF.intersects(br, RectF(p.x, 0f, p.x+70f, p.gapY-gap)) ||
-                RectF.intersects(br, RectF(p.x, p.gapY+gap, p.x+70f, h*.84f))
-            }) state = State.GAMEOVER
-    }
-
-    private fun saveHigh() {
-        if (score > high) { high = score; prefs.edit().putInt("high", high).apply() }
-    }
-
-    private fun drawGame(c: Canvas) {
-        val w = width.toFloat(); val h = height.toFloat(); val pw = 70f
-        pipes.forEach { p ->
-            val gap = h*.135f
-            paint.color = Color.rgb(48, 220, 35)
-            c.drawRect(p.x, 0f, p.x+pw, p.gapY-gap, paint)
-            c.drawRect(p.x, p.gapY+gap, p.x+pw, h*.84f, paint)
-            paint.color = Color.rgb(85, 240, 40)
-            c.drawRect(p.x-12f, p.gapY-gap-20f, p.x+pw+12f, p.gapY-gap, paint)
-            c.drawRect(p.x-12f, p.gapY+gap, p.x+pw+12f, p.gapY+gap+20f, paint)
-        }
-        val bw = w*.22f; val bh = h*.145f; val bx = w*.19f
-        c.drawBitmap(bird, null, RectF(bx-bw/2, y-bh/2, bx+bw/2, y+bh/2), paint)
-        text(c, score.toString(), w/2, h*.105f, h*.075f, true)
-    }
-
-    private fun drawGameOver(c: Canvas) {
-        val w = width.toFloat(); val h = height.toFloat()
-        paint.color = Color.argb(165, 0, 0, 0); c.drawRect(0f, 0f, w, h, paint)
-        text(c, "OYUN BİTTİ", w/2, h*.30f, h*.07f, true)
-        text(c, "Skor: $score   Rekor: $high", w/2, h*.39f, h*.035f, false)
-        button(c, h*.50f, h*.61f, "TEKRAR OYNA")
-        button(c, h*.65f, h*.75f, "ANA MENÜ")
-    }
-
-    private fun start() {
-        state = State.PLAYING; score = 0; pipes.clear(); spawn = .2f; y = height*.45f; vy = 0f
-    }
-
-    override fun onTouchEvent(e: MotionEvent): Boolean {
-        if (e.action != MotionEvent.ACTION_DOWN) return true
-        val h = height.toFloat()
-        when (state) {
-            State.MENU -> when {
-                e.y in h*.48f..h*.60f -> start()
-                e.y in h*.64f..h*.74f -> muted = !muted
-            }
-            State.PLAYING -> vy = -h*.48f
-            State.GAMEOVER -> when {
-                e.y in h*.50f..h*.61f -> start()
-                e.y in h*.65f..h*.75f -> state = State.MENU
-            }
-        }
-        return true
-    }
+    override fun onDetachedFromWindow(){tone.release();super.onDetachedFromWindow()}
+    override fun onDraw(canvas:Canvas){super.onDraw(canvas);val now=System.nanoTime();val dt=min((now-lastTimeNs)/1_000_000_000f,.033f);lastTimeNs=now;drawBackground(canvas);when(state){State.MENU->drawMenu(canvas);State.PLAYING->{update(dt);drawGame(canvas)};State.GAMEOVER->{drawGame(canvas);drawGameOver(canvas)}};postInvalidateOnAnimation()}
+    private fun drawBackground(c:Canvas){val w=width.toFloat();val h=height.toFloat();paint.shader=LinearGradient(0f,0f,0f,h*.72f,Color.rgb(55,180,245),Color.rgb(205,225,235),Shader.TileMode.CLAMP);c.drawRect(0f,0f,w,h,paint);paint.shader=null;drawCloud(c,w*.12f,h*.13f,w*.13f);drawCloud(c,w*.83f,h*.19f,w*.15f);drawCloud(c,w*.28f,h*.27f,w*.10f);val m=Path().apply{moveTo(0f,h*.45f);lineTo(w*.22f,h*.38f);lineTo(w*.40f,h*.43f);lineTo(w*.52f,h*.27f);lineTo(w*.64f,h*.42f);lineTo(w*.80f,h*.34f);lineTo(w,h*.44f);lineTo(w,h*.62f);lineTo(0f,h*.62f);close()};paint.color=Color.rgb(78,150,215);c.drawPath(m,paint);val s=Path().apply{moveTo(w*.37f,h*.42f);lineTo(w*.52f,h*.27f);lineTo(w*.63f,h*.43f);lineTo(w*.56f,h*.39f);lineTo(w*.51f,h*.33f);lineTo(w*.46f,h*.40f);close()};paint.color=Color.WHITE;c.drawPath(s,paint);drawCity(c,w,h);paint.color=Color.rgb(45,150,62);c.drawRect(0f,h*.72f,w,h*.79f,paint);for(x in -30..w.toInt() step 70){paint.color=Color.rgb(85,210,65);c.drawCircle(x.toFloat(),h*.75f,45f,paint)};paint.color=Color.rgb(75,185,55);c.drawRect(0f,h*.79f,w,h*.815f,paint);paint.color=Color.rgb(242,211,150);c.drawRect(0f,h*.815f,w,h,paint);paint.color=Color.rgb(35,105,40);c.drawRect(0f,h*.79f,w,h*.805f,paint)}
+    private fun drawCloud(c:Canvas,x:Float,y:Float,s:Float){paint.color=Color.argb(235,255,255,255);c.drawCircle(x,y,s*.34f,paint);c.drawCircle(x+s*.28f,y-s*.08f,s*.42f,paint);c.drawCircle(x+s*.58f,y,s*.30f,paint);c.drawRoundRect(x-s*.35f,y,x+s*.78f,y+s*.25f,s*.12f,s*.12f,paint)}
+    private fun drawCity(c:Canvas,w:Float,h:Float){val base=h*.70f;var x=0f;val rnd=Random(12);while(x<w){val bw=(32+rnd.nextInt(40)).toFloat();val bh=(70+rnd.nextInt(130)).toFloat();paint.color=Color.rgb(215,205,185);c.drawRect(x,base-bh,x+bw,base,paint);paint.color=Color.rgb(105,150,170);for(wx in x+8 until (x+bw-5).toInt() step 16)for(wy in (base-bh+14).toInt() until (base-10).toInt() step 24)if(rnd.nextFloat()>.3f)c.drawRect(wx.toFloat(),wy.toFloat(),wx+7f,wy+10f,paint);x+=bw+6};paint.color=Color.rgb(205,195,175);c.drawRect(w*.40f,base-h*.12f,w*.62f,base,paint);c.drawOval(w*.41f,base-h*.25f,w*.61f,base-h*.02f,paint);for(mx in listOf(w*.36f,w*.64f)){paint.color=Color.rgb(195,185,165);c.drawRect(mx,base-h*.30f,mx+18f,base,paint);val p=Path().apply{moveTo(mx-8f,base-h*.30f);lineTo(mx+9f,base-h*.37f);lineTo(mx+26f,base-h*.30f);close()};c.drawPath(p,paint)};paint.color=Color.rgb(135,115,95);c.drawRect(w*.07f,base-h*.12f,w*.16f,base,paint);val tp=Path().apply{moveTo(w*.06f,base-h*.12f);lineTo(w*.115f,base-h*.24f);lineTo(w*.17f,base-h*.12f);close()};c.drawPath(tp,paint);paint.color=Color.rgb(242,238,220);c.drawCircle(w*.115f,base-h*.18f,22f,paint);paint.color=Color.DKGRAY;c.drawLine(w*.115f,base-h*.18f,w*.115f,base-h*.205f,paint);c.drawLine(w*.115f,base-h*.18f,w*.14f,base-h*.17f,paint);paint.color=Color.rgb(150,130,105);c.drawRect(w*.76f,base-h*.20f,w*.96f,base,paint);for(xx in w*.76f..w*.96f step 36f)c.drawRect(xx,base-h*.24f,xx+22f,base-h*.20f,paint)}
+    private fun drawMenu(c:Canvas){val w=width.toFloat();val h=height.toFloat();paint.color=Color.argb(125,0,25,55);c.drawRect(0f,0f,w,h,paint);text(c,"ERCİYES UÇUŞU",w/2,h*.22f,h*.065f,true);text(c,"Kayseri'nin üzerinde ne kadar uçabilirsin?",w/2,h*.29f,h*.027f,false);drawButton(c,h*.46f,h*.56f,"OYUNA BAŞLA");drawButton(c,h*.60f,h*.69f,if(muted)"SESİ AÇ" else "SESİ KAPAT");text(c,"EN YÜKSEK SKOR  $high",w/2,h*.79f,h*.028f,true);text(c,"Ekrana dokun ve uç!",w/2,h*.88f,h*.023f,false)}
+    private fun drawButton(c:Canvas,top:Float,bottom:Float,label:String){val w=width.toFloat();val l=w*.18f;val r=w*.82f;paint.color=Color.rgb(255,193,7);c.drawRoundRect(l,top,r,bottom,32f,32f,paint);paint.color=Color.WHITE;paint.style=Paint.Style.STROKE;paint.strokeWidth=3f;c.drawRoundRect(l,top,r,bottom,32f,32f,paint);paint.style=Paint.Style.FILL;text(c,label,w/2,(top+bottom)/2+(bottom-top)*.13f,(bottom-top)*.30f,true)}
+    private fun text(c:Canvas,s:String,x:Float,y:Float,size:Float,bold:Boolean){paint.color=Color.WHITE;paint.textAlign=Paint.Align.CENTER;paint.textSize=size;paint.typeface=Typeface.create(Typeface.DEFAULT,if(bold)Typeface.BOLD else Typeface.NORMAL);c.drawText(s,x,y,paint)}
+    private fun update(dt:Float){val w=width.toFloat();val h=height.toFloat();velocity+=h*1.25f*dt;birdY+=velocity*dt;spawnTimer-=dt;if(spawnTimer<=0f){spawnTimer=max(.95f,1.35f-score*.012f);val minY=h*.25f;val maxY=h*.62f;pipes+=Pipe(w+30f,Random.nextFloat()*(maxY-minY)+minY)};val speed=w*(.40f+min(score,40)*.004f);val pw=w*.12f;val gap=h*.105f;val floor=h*.79f;pipes.forEach{p->p.x-=speed*dt;if(!p.passed&&p.x+pw<w*.18f){p.passed=true;score++;if(score>high){high=score;newRecordShown=true;prefs.edit().putInt("high",high).apply()};play(ToneGenerator.TONE_PROP_ACK)}};pipes.removeAll{it.x+pw< -20f};val bw=w*.20f;val bh=h*.105f;val bx=w*.19f;val br=RectF(bx-bw*.4f,birdY-bh*.4f,bx+bw*.4f,birdY+bh*.4f);val hit=pipes.any{p->RectF.intersects(br,RectF(p.x,0f,p.x+pw,p.gapY-gap))||RectF.intersects(br,RectF(p.x,p.gapY+gap,p.x+pw,floor))};if(birdY-bh*.4f<0f||birdY+bh*.4f>floor||hit){state=State.GAMEOVER;play(ToneGenerator.TONE_PROP_NACK)}}
+    private fun play(id:Int){if(!muted)tone.startTone(id,90)}
+    private fun drawGame(c:Canvas){val w=width.toFloat();val h=height.toFloat();val pw=w*.12f;val gap=h*.105f;val floor=h*.79f;pipes.forEach{p->drawPipe(c,p.x,pw,0f,p.gapY-gap,true);drawPipe(c,p.x,pw,p.gapY+gap,floor,false)};val bw=w*.20f;val bh=h*.105f;val bx=w*.19f;val a=min(25f,max(-25f,velocity/h*95f));c.save();c.rotate(a,bx,birdY);c.drawBitmap(bird,null,RectF(bx-bw/2,birdY-bh/2,bx+bw/2,birdY+bh/2),paint);c.restore();text(c,score.toString(),w/2,h*.095f,h*.065f,true)}
+    private fun drawPipe(c:Canvas,x:Float,width:Float,top:Float,bottom:Float,capAtBottom:Boolean){paint.color=Color.rgb(54,205,42);c.drawRect(x,top,x+width,bottom,paint);paint.color=Color.rgb(98,238,55);c.drawRect(x+width*.16f,top,x+width*.27f,bottom,paint);paint.color=Color.rgb(25,145,24);c.drawRect(x+width*.82f,top,x+width,bottom,paint);val ch=width*.20f;val l=x-width*.1f;val r=x+width*1.1f;val ct=if(capAtBottom)bottom-ch else top;val cb=if(capAtBottom)bottom else top+ch;paint.color=Color.rgb(67,224,45);c.drawRect(l,ct,r,cb,paint);paint.color=Color.rgb(20,110,20);paint.style=Paint.Style.STROKE;paint.strokeWidth=3f;c.drawRect(l,ct,r,cb,paint);paint.style=Paint.Style.FILL}
+    private fun drawGameOver(c:Canvas){val w=width.toFloat();val h=height.toFloat();paint.color=Color.argb(170,0,20,35);c.drawRect(0f,0f,w,h,paint);text(c,"OYUN BİTTİ",w/2,h*.29f,h*.062f,true);text(c,"Skor: $score",w/2,h*.38f,h*.033f,false);text(c,"Rekor: $high",w/2,h*.425f,h*.033f,true);if(newRecordShown)text(c,"YENİ REKOR!",w/2,h*.475f,h*.035f,true);drawButton(c,h*.52f,h*.62f,"TEKRAR OYNA");drawButton(c,h*.66f,h*.76f,"ANA MENÜ")}
+    private fun startGame(){state=State.PLAYING;score=0;pipes.clear();spawnTimer=.25f;birdY=height*.44f;velocity=0f;newRecordShown=false;lastTimeNs=System.nanoTime()}
+    override fun onTouchEvent(event:MotionEvent):Boolean{if(event.action!=MotionEvent.ACTION_DOWN)return true;val h=height.toFloat();when(state){State.MENU->when{event.y in h*.46f..h*.56f->startGame();event.y in h*.60f..h*.69f->{muted=!muted;prefs.edit().putBoolean("muted",muted).apply()}};State.PLAYING->{velocity=-h*.47f;play(ToneGenerator.TONE_PROP_BEEP)};State.GAMEOVER->when{event.y in h*.52f..h*.62f->startGame();event.y in h*.66f..h*.76f->{state=State.MENU;lastTimeNs=System.nanoTime()}}};return true}
 }
