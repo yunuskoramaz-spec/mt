@@ -1,68 +1,45 @@
 # Erciyes Uçuşu
 
-Kayseri ve Erciyes temalı, özgün bir Android arcade oyunu. Oyuncu, gönderilen karakter görselini kullanarak engeller arasından uçar.
+Kayseri ve Erciyes temalı native Android arcade oyunu.
+
+## v3 görsel ve performans yenilemesi
+- Oyun mantığı 1080x1920 sanal koordinat sisteminde çalışır.
+- Tek `Choreographer.FrameCallback` oyun döngüsü kullanılır; dokunma yeni loop/Runnable oluşturmaz.
+- Delta time 0..33 ms aralığına sınırlandırılır ve fizik FPS'ten bağımsızdır.
+- Canvas transformu her frame `save()/restore()` ile izole edilir.
+- Dokunma koordinatları tek uniform ölçeğin inverse transformu ile oyun koordinatına çevrilir.
+- Bitmap oyun başlangıcında bir kez yüklenir ve kuş tam source rectangle ile çizilir.
+- Kuş boruların ve tüm dekoratif arka plan katmanlarının üstünde çizilir.
+- Collision kuşun gerçek çizim merkezinden türetilir ve yaklaşık %18 inset uygulanır.
+- Üst ve alt boru hitboxları ayrı hesaplanır; boru boşluğu collision dışındadır.
+- İlk boru ekran dışında başlar ve başlangıç boşluğu kuşun başlangıç yüksekliğine hizalanır.
+- Boru, HUD, menü ve oyun sonu kartları yeniden tasarlandı.
+- Alt zemin oyun alanının yalnızca son bölümünü kaplar.
+- Erciyes, Kayseri şehir silüeti, kubbe/minare ve bulutlar sade katmanlar halinde çizilir.
+
+## Oynanış
+- Ana menüden Oyuna Başla seçilir.
+- Oyun sırasında `ACTION_DOWN` kuşu bir kez zıplatır.
+- Boru boşluğundan tamamen geçildiğinde skor bir kez artar.
+- Boruya, üst sınıra veya zemine çarpınca oyun biter.
+- Tekrar Oyna temiz oyun state'i ile başlar.
+- Ana Menü eski boruları temizler.
+- Ses açılıp kapatılabilir.
+
+## Bilinen test durumu
+**GitHub Actions:** `clean assembleDebug` başarılı ve debug APK artifact olarak üretildi.
+
+**Kod seviyesinde doğrulama:** sanal koordinat sistemi, inverse touch transformu, tek Choreographer loop, collision boşluğu, skorun tekilleştirilmesi, ilk boru güvenliği, Canvas save/restore ve tam bitmap çizimi kontrol edildi.
+
+**Gerçek cihaz/emülatör:** Bu geliştirme ortamında Android cihaz/emülatör ve `adb` bulunmadığı için v3 APK'nın fiziksel kurulum ve 5 dakikalık gerçek oynanış testi yapılamadı. Bu nedenle gerçek cihaz testi tamamlandı olarak işaretlenmez.
+
+**Performans:** Frame update çizimden ayrıldı, bitmap decode frame dışına alındı, arka plan path'leri önceden oluşturuldu ve tek frame callback kullanıldı. Hedef 60 FPS'tir; gerçek cihaz FPS ölçümü yapılmadı.
 
 ## Teknoloji
 - Native Android / Kotlin
 - Android Gradle Plugin 8.7.3
 - Kotlin 2.0.21
 - compileSdk / targetSdk 35, minSdk 23
-- Canvas tabanlı oyun döngüsü
-- Offline çalışma
-- SharedPreferences ile kalıcı yüksek skor
-- ToneGenerator ile basit oyun sesleri
-
-## Oynanış
-- Ana menüden **Oyuna Başla** seçilir.
-- Oyun sırasında yalnızca `ACTION_DOWN` dokunuşu karakteri yukarı zıplatır.
-- Yer çekimi karakteri aşağı çeker.
-- Boruların arasından geçildikçe skor 1 artar ve aynı boru tekrar skor vermez.
-- Boruya, üst sınıra veya zemine çarpınca oyun biter.
-- Oyun hızı skor yükseldikçe kademeli olarak artar.
-- Yüksek skor cihazda saklanır.
-- Ses menüden açılıp kapatılabilir.
-
-## Görseller
-- `app/src/main/res/drawable-nodpi/player_bird.png`: sağlanan karakter görseli, tam bitmap kaynağı kullanılarak aspect ratio korunur.
-- Kayseri/Erciyes arka planı Canvas üzerinde çizilir; boru ve karakter görüntüsü arka plana gömülü değildir.
-
-## Oyun mekaniği ve düzeltmeler
-- Kuş hitbox'ı çizilen kuşun merkezine bağlıdır ve her kenardan yaklaşık %15 inset uygulanır.
-- Üst ve alt boruların ayrı `RectF` collision alanları vardır.
-- Collision koordinatları doğrudan boruların çizim koordinatlarından gelir; oyun boşluğu collision alanına dahil edilmez.
-- Boru kapakları boşluğun içine taşmayacak şekilde katı boru tarafında çizilir.
-- İlk boru ekranın dışında ve kuşun başlangıç yüksekliğine hizalı geniş bir boşlukla oluşturulur.
-- Oyun parametreleri `onSizeChanged()` içinde ekran boyutuna göre hesaplanır: `gravity`, `flapVelocity`, `pipeSpeed`, `pipeGap`, `birdSize`.
-- Dokunma olayında `setContentView()`, `requestLayout()`, `Canvas.translate()` veya `Canvas.scale()` çağrılmaz.
-- Tek oyun döngüsü `postInvalidateOnAnimation()` ile çalışır; dokunma yeni bir loop başlatmaz.
-- `onDraw()` Canvas durumunu `save()/restore()` ile izole eder.
-
-## Bilinen test durumu
-**GitHub Actions clean assembleDebug:** Başarılı. APK yapısal olarak doğrulandı.
-
-**Kod seviyesinde kontrol edilen senaryolar:** collision alanlarının boşluğu kapsamaması, kuş hitbox toleransı, ilk borunun güvenli mesafesi, tekil skor artırımı, yeniden başlatmada boruların temizlenmesi, ana menü dönüşü, mute ayarının saklanması ve dokunmanın yeni oyun döngüsü başlatmaması.
-
-**Gerçek cihaz/emülatör testi:** Bu build ortamında Android cihaz/emülatör ve `adb` bulunmadığından fiziksel kurulum ve dokunmatik ekran testi gerçekleştirilemedi. Bu nedenle gerçek cihaz testi henüz doğrulanmış kabul edilmez.
-
-## Yerel derleme
-Android Studio güncel bir sürümle projeyi açın ve Android SDK 35'in kurulu olduğundan emin olun.
-
-```bash
-./gradlew clean assembleDebug
-```
-
-APK:
-`app/build/outputs/apk/debug/app-debug.apk`
-
-Wrapper dosyaları mevcut değilse Android Studio'nun Gradle senkronizasyonunu veya sistemdeki Gradle 8.9 kurulumunu kullanarak wrapper üretilebilir:
-
-```bash
-gradle wrapper --gradle-version 8.9
-./gradlew clean assembleDebug
-```
-
-## GitHub Actions
-`.github/workflows/android.yml` her push'ta Ubuntu runner üzerinde Java 17, Gradle 8.9 ve Android SDK 35 ile debug APK üretir. APK, Actions artifact olarak yayınlanır.
-
-## Release APK
-Release imzalama anahtarı bu repoya eklenmemiştir. Gerçek mağaza dağıtımı için kendi keystore'unuzu güvenli şekilde CI secrets üzerinden bağlayıp `assembleRelease` çalıştırın. Keystore veya şifreleri repoya koymayın.
+- Canvas + Choreographer
+- SharedPreferences
+- ToneGenerator
