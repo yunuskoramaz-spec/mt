@@ -1,0 +1,79 @@
+name: Visual Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  visual-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+
+      - name: Run unit tests and build
+        run: |
+          gradle --no-daemon testDebugUnitTest
+          gradle --no-daemon clean assembleDebug
+
+      - name: Capture eight visual states on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: Pixel_2
+          emulator-options: -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect
+          disable-animations: true
+          script: |
+            mkdir -p visual-validation
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell am force-stop com.q3rvo.erciyesflight
+            adb shell am start -n com.q3rvo.erciyesflight/.MainActivity
+            sleep 2
+            adb exec-out screencap -p > visual-validation/01-menu.png
+            adb shell input tap 540 1100
+            sleep 0.35
+            adb exec-out screencap -p > visual-validation/02-game-start.png
+            sleep 0.35
+            adb shell input tap 540 1100
+            sleep 0.25
+            adb exec-out screencap -p > visual-validation/03-bird-center.png
+            for i in $(seq 1 8); do adb shell input tap 540 1100; sleep 0.34; done
+            adb exec-out screencap -p > visual-validation/04-score-early.png
+            for i in $(seq 1 20); do adb shell input tap 540 1100; sleep 0.34; done
+            adb exec-out screencap -p > visual-validation/05-score-late.png
+            sleep 3.5
+            adb exec-out screencap -p > visual-validation/06-game-over.png
+            adb shell input tap 540 1140
+            sleep 0.45
+            adb exec-out screencap -p > visual-validation/07-replay.png
+            sleep 3.5
+            adb shell input tap 540 1235 || true
+            sleep 0.35
+            adb shell input tap 540 1410
+            sleep 0.35
+            adb exec-out screencap -p > visual-validation/08-settings.png
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: erciyes-ucusu-visual-validation-screenshots
+          path: visual-validation/*.png
+          if-no-files-found: error
