@@ -1,4 +1,4 @@
-name: Visual Debug
+name: Ada Kuşum Visual Debug
 
 on:
   workflow_dispatch:
@@ -21,9 +21,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
-      - name: Build APK
+      - name: Build Ada Kuşum APK
         run: gradle --no-daemon clean assembleDebug
-      - name: Capture runtime diagnostics
+      - name: Capture Ada Kuşum runtime diagnostics
         id: emulator
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
@@ -31,7 +31,7 @@ jobs:
           api-level: 34
           target: google_apis
           arch: x86_64
-          profile: Pixel_2
+          profile: pixel_2
           force-avd-creation: true
           wipe-data: true
           disable-animations: true
@@ -71,10 +71,10 @@ jobs:
             adb shell screencap -p /sdcard/settings.png
             adb pull /sdcard/settings.png visual-debug/08-settings.png
             adb logcat -d > visual-debug/logcat.txt
-      - name: Upload diagnostics
+      - name: Upload Ada Kuşum diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: erciyes-ucusu-visual-debug
+          name: ada-kusum-visual-debug
           path: visual-debug
           if-no-files-found: warn
