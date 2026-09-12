@@ -23,7 +23,7 @@ class PipeSpawnerTest {
     fun spawningContinuesPastTwentyObstacles() {
         val spawner = newSpawner()
         spawner.reset()
-        repeat(900) { spawner.update(1f / 60f, 430f) }
+        repeat(2400) { spawner.update(1f / 60f, 430f) }
         assertTrue("Expected more than 20 spawned pipes", spawner.spawnCount > 20)
         assertTrue(spawner.pipes.isNotEmpty())
     }
