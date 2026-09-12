@@ -1,0 +1,77 @@
+name: Final Visual Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  visual-final:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+      - name: Unit tests and APK build
+        run: |
+          gradle --no-daemon testDebugUnitTest
+          gradle --no-daemon clean assembleDebug
+      - name: Capture and verify eight screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: Pixel_2
+          force-avd-creation: true
+          wipe-data: true
+          disable-animations: true
+          emulator-options: -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
+          script: |
+            OUT="$GITHUB_WORKSPACE/visual-validation"
+            mkdir -p "$OUT"
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell am force-stop com.q3rvo.erciyesflight
+            adb shell am start -n com.q3rvo.erciyesflight/.MainActivity
+            sleep 3
+            adb shell screencap -p /sdcard/01.png && adb pull /sdcard/01.png "$OUT/01-menu.png"
+            adb shell input tap 540 1100
+            sleep 0.4
+            adb shell screencap -p /sdcard/02.png && adb pull /sdcard/02.png "$OUT/02-game-start.png"
+            sleep 0.4
+            adb shell input tap 540 1100
+            sleep 0.25
+            adb shell screencap -p /sdcard/03.png && adb pull /sdcard/03.png "$OUT/03-bird-center.png"
+            for i in $(seq 1 8); do adb shell input tap 540 1100; sleep 0.34; done
+            adb shell screencap -p /sdcard/04.png && adb pull /sdcard/04.png "$OUT/04-score-early.png"
+            for i in $(seq 1 20); do adb shell input tap 540 1100; sleep 0.34; done
+            adb shell screencap -p /sdcard/05.png && adb pull /sdcard/05.png "$OUT/05-score-late.png"
+            sleep 3.5
+            adb shell screencap -p /sdcard/06.png && adb pull /sdcard/06.png "$OUT/06-game-over.png"
+            adb shell input tap 540 1140
+            sleep 0.5
+            adb shell screencap -p /sdcard/07.png && adb pull /sdcard/07.png "$OUT/07-replay.png"
+            adb shell input tap 540 1235 || true
+            sleep 0.4
+            adb shell input tap 540 1410 || true
+            sleep 0.4
+            adb shell screencap -p /sdcard/08.png && adb pull /sdcard/08.png "$OUT/08-settings.png"
+            test "$(find "$OUT" -maxdepth 1 -name '*.png' | wc -l)" -eq 8
+            ls -lh "$OUT"
+      - name: Upload screenshots and APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: erciyes-ucusu-final-visual-validation
+          path: |
+            visual-validation/*.png
+            app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
