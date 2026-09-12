@@ -1,64 +1,50 @@
-# Erciyes Uçuşu
+# Ada Kuşum
 
-Kayseri ve Erciyes temalı native Android arcade oyunu.
-
-## Görsel kalite geri dönüşü
-- Aydınlık mavi gökyüzü, sade Erciyes silüeti, düşük kontrastlı Kayseri şehir çizgisi ve yeşil zemin kullanılır.
-- Oyun karakteri ayrı `birdPaint` ile çizilir; her frame öncesi `alpha = 255` ve `colorFilter = null` zorlanır.
-- Oyun HUD'unda yalnızca güncel skor bulunur. `YENİ REKOR` yalnızca oyun bittikten sonra ve final skor önceki rekoru geçtiyse görünür.
-- Boru genişliği 160/1080, boşluk 600/1920 sanal tasarım alanındadır. Kapaklar gövdeye göre sınırlı genişletilir.
-- Cam/blur ağırlıklı efektler ve oyun sırasında karartma overlay'i kaldırılmıştır. Overlay yalnızca `GAMEOVER` durumunda çizilir.
-- Status/navigation bar renkleri gökyüzü ve zeminle uyumludur; Android 15 edge-to-edge opt-out ve tek inset hesap noktası kullanılır.
-- `CleanGameView` menü, ayarlar, oyun, sade skor HUD'u ve oyun sonu kartını tek kontrollü görsel hiyerarşide render eder.
-
-## Oyun döngüsü ve performans
-- Tek `Choreographer.FrameCallback` kullanılır.
-- `framePosted` + `running` ile aynı callback'in birden fazla planlanması engellenir.
-- Frame delta `0..0.033s` aralığına clamp edilir.
-- `onPause()` callback'i durdurur; `onResume()` zaman tabanını sıfırlar.
-- Touch yalnızca `ACTION_DOWN` üzerinde flap üretir.
-- Render ve fizik ayrıdır.
-- Bitmap decode, kuş frame hazırlığı, shader ve font hazırlığı başlangıçta yapılır.
-- Frame içinde yeni `RectF`, `Path`, `Bitmap` veya `Typeface` oluşturulmaz.
-- Debug build'de her 600 frame'de FPS, maksimum frame aralığı, callback ve aktif pipe sayısı Logcat'e yazılır.
-
-## Sonsuz engel sistemi
-`PipeSpawner` boruların tek sahibidir.
-- Sabit `MAX_PIPES = 8` sınırı yoktur.
-- Ekran dışı borular temizlenir.
-- Aynı fizik güncellemesinde en fazla bir yeni boru eklenir.
-- Ardışık borular sabit spacing ile korunur.
-- NaN/infinite X ve spacing ihlalleri invariant ile yakalanır.
-- `reset()` temiz oyun state'i kurar.
-- Per-frame `sortedBy`, `maxByOrNull`, `removeAll` ve lambda tabanlı invariant taramaları kaldırılmıştır.
-
-## Ses ve haptic
-`ToneGenerator` kaldırıldı. `PremiumSoundEngine` başlangıçta PCM ses bankasını hazırlar ve oyun sırasında yeniden kullanır.
-
-## Otomatik doğrulama
-`PipeSpawnerTest` şunları doğrular:
-- 20'den fazla engel üretimi.
-- Uzun simülasyonda 35+ engel üretimi.
-- Aktif listenin bounded kalması.
-- Sabit spacing ve gelecekte boru bulunması.
-- NaN/infinite X oluşmaması.
-- Reset sonrası temiz ilk boru ve ID.
-- Tek update'te burst spawn olmaması.
-
-GitHub Actions önce `testDebugUnitTest`, ardından `clean assembleDebug` çalıştırır ve APK bütünlüğünü doğrular.
-
-## Görsel doğrulama
-`Final Visual Validation` workflow'u Android 14 emülatöründe menü, oyun başlangıcı, kuş merkez, erken skor, geç skor, oyun sonu, tekrar oynama ve ayarlar durumlarını ekran görüntüsü olarak toplamayı ve tam 8 PNG oluştuğunu doğrulamayı hedefler.
-
-## Test durumu
-- Unit test + debug APK build: başarılı.
-- Android 14 emülatöründe runtime tanılama: başarılı.
-- APK: doğrulanmış ve artifact olarak yüklenmiştir.
-- Görsel ekran görüntüsü artifact'ı için final workflow ayrıca tetiklenmektedir.
+Ada Kuşum, Kayseri atmosferinden ilham alan özgün bir Android arcade oyunudur. Oyuncu, gönderilen karakter görselini kullanarak engeller arasından uçar.
 
 ## Teknoloji
 - Native Android / Kotlin
+- Android Gradle Plugin 8.7.3
+- Kotlin 2.0.21
 - compileSdk / targetSdk 35, minSdk 23
-- Canvas + Choreographer
-- SharedPreferences
-- AudioTrack / PCM
+- Canvas tabanlı oyun döngüsü
+- Offline çalışma
+- SharedPreferences ile kalıcı yüksek skor
+- SoundPool ile yerel oyun sesleri
+
+## Oynanış
+- Ana menüden **Oyuna Başla** seçilir.
+- Oyun sırasında her dokunuş karakteri yukarı zıplatır.
+- Yer çekimi karakteri aşağı çeker.
+- Boruların arasından geçildikçe skor 1 artar.
+- Boruya, üst sınıra veya zemine çarpınca oyun biter.
+- Oyun hızı skor yükseldikçe kademeli olarak artar.
+- Yüksek skor cihazda saklanır.
+- Ses menüden açılıp kapatılabilir.
+
+## Görseller
+- `app/src/main/res/drawable-nodpi/player_bird.png`: kullanıcının sağladığı karakter görseli, şeffaf arka planlı.
+- `app/src/main/res/drawable-nodpi/background.png`: Kayseri atmosferinden ilham alan özgün arka plan.
+
+## Yerel derleme
+Android Studio güncel bir sürümle projeyi açın ve Android SDK 35'in kurulu olduğundan emin olun.
+
+```bash
+./gradlew clean assembleDebug
+```
+
+APK:
+`app/build/outputs/apk/debug/app-debug.apk`
+
+Wrapper dosyaları mevcut değilse Android Studio'nun Gradle senkronizasyonunu veya sistemdeki Gradle 8.9+ kurulumunu kullanarak wrapper üretilebilir:
+
+```bash
+gradle wrapper --gradle-version 8.9
+./gradlew clean assembleDebug
+```
+
+## GitHub Actions
+`.github/workflows/android.yml` her push'ta Ubuntu runner üzerinde Java 17, Gradle 8.9 ve Android SDK 35 ile debug APK üretir. APK, Actions artifact olarak yayınlanır.
+
+## Release APK
+Release imzalama anahtarı bu repoya eklenmemiştir. Gerçek mağaza dağıtımı için kendi keystore'unuzu güvenli şekilde CI secrets üzerinden bağlayıp `assembleRelease` çalıştırın. Keystore veya şifreleri repoya koymayın.
