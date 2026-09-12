@@ -1,4 +1,4 @@
-name: Visual Validation
+name: Ada Kuşum Visual Validation
 
 on:
   workflow_dispatch:
@@ -12,34 +12,31 @@ jobs:
   visual-validation:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Ada Kuşum
         uses: actions/checkout@v4
-
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
-
-      - name: Run unit tests and build
+      - name: Run Ada Kuşum unit tests and build
         run: |
           gradle --no-daemon testDebugUnitTest
           gradle --no-daemon clean assembleDebug
-
-      - name: Capture eight visual states on Android emulator
+      - name: Capture eight Ada Kuşum visual states on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           target: google_apis
           arch: x86_64
-          profile: Pixel_2
-          emulator-options: -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect
+          profile: pixel_2
+          force-avd-creation: true
+          emulator-options: -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
           disable-animations: true
           script: |
             mkdir -p visual-validation
@@ -70,10 +67,9 @@ jobs:
             adb shell input tap 540 1410
             sleep 0.35
             adb exec-out screencap -p > visual-validation/08-settings.png
-
-      - name: Upload screenshots
+      - name: Upload Ada Kuşum screenshots
         uses: actions/upload-artifact@v4
         with:
-          name: erciyes-ucusu-visual-validation-screenshots
+          name: ada-kusum-visual-validation-screenshots
           path: visual-validation/*.png
           if-no-files-found: error
