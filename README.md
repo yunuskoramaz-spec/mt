@@ -1,54 +1,77 @@
 # Erciyes Uçuşu
 
-Kayseri ve Erciyes temalı native Android arcade oyunu.
+Kayseri ve Erciyes temalı, premium görsel dil hedefiyle yeniden tasarlanmış native Android arcade oyunu.
 
-## v4 kalite yenilemesi
-- 1080x1920 sanal oyun alanı ve tek uniform ölçek kullanılır.
-- Tek `Choreographer.FrameCallback` vardır; `frameCallbackPosted` + `isRunning` ile aynı callback iki kez planlanamaz.
-- İlk frame delta'sı `0f`; diğer delta değerleri `0..0.033s` aralığına clamp edilir.
-- `onPause()` oyun döngüsünü durdurur; `onResume()` zaman tabanını sıfırlayarak fizik sıçramasını önler.
-- Dokunma yalnızca `ACTION_DOWN` üzerinde flap üretir. Touch hiçbir zaman yeni loop, Runnable, layout veya Activity oluşturmaz.
-- Frame içi pahalı `LinearGradient` ve `Typeface.create` üretimleri kaldırıldı; shader ve fontlar bir kez hazırlanır.
-- Bitmap bir kez yüklenir ve tam kaynak alanıyla aspect ratio korunarak çizilir.
-- Boru yaşam döngüsü `PipeSpawner` içine ayrıldı. Render katmanı boru listesine dokunmaz.
-- Sabit `MAX_PIPES = 8` sınırı kaldırıldı. Borular ekran dışına çıktıkça silinir ve sağ tarafta yeniden üretilir.
-- Borular benzersiz ID taşır; skor ve spawn birbirinden bağımsızdır.
-- Her fizik güncellemesinde en fazla bir yeni boru oluşturulur.
-- Aktif boru listesi sürekli korunur; NaN/infinite koordinatlar ve spacing ihlalleri invariant ile yakalanır.
-- İlk üç engel daha öngörülebilir boşlukla başlar; sonraki boşluklar kontrollü rastgelelik kullanır.
-- Oyun sonu state'inde fizik güncellemesi durur; tekrar oynama ve ana menü geçişleri boru state'ini temiz başlatır.
-- Oyun sonu kartı mevcut premium tasarım korunarak merkez hizası ve sabit tasarım koordinatlarıyla çizilir.
+## Premium 2026 yeniden tasarımı
+- Erciyes laciverti, buz mavisi, sıcak altın, petrol yeşili ve kırık beyazdan oluşan tutarlı renk tokenları.
+- Özel oyun logosu: Erciyes dağı + kanat/uçuş izi motifi.
+- Katmanlı gökyüzü, bulut, Erciyes silüeti, Kayseri şehir silüeti ve ön plan zemininden oluşan 2.5D dünya.
+- Kayseri taş mimarisinden esinlenen, gradient/highlight/gölge kullanan yeni kule engelleri.
+- Cam görünümlü skor HUD'u, merkezlenmiş oyun sonu kartı ve birincil/ikincil buton hiyerarşisi.
+- Ana menüde idle kuş animasyonu, logo giriş animasyonu ve buton basma mikro animasyonu.
+- Oyun içinde kuş dönüşü + 3 karelik önceden hazırlanmış idle/flap ölçek animasyonu.
+- Çarpışmada kısa parçacık ve flash efekti; oyun sonu ekranında fizik tamamen durur.
+- Ayarlar ekranında ses ve haptic kontrolü; tercihler SharedPreferences ile korunur.
+- Farklı ekran oranlarında uniform tasarım ölçeği ve Android system-bar inset güvenli alanı.
 
-## Oynanış
-- Ana menüden Oyuna Başla seçilir.
-- Oyun sırasında `ACTION_DOWN` kuşu bir kez zıplatır.
-- Boru boşluğundan tamamen geçildiğinde skor bir kez artar.
-- Boruya, üst sınıra veya zemine çarpınca oyun biter.
-- Boru üretimi skora veya dokunmaya bağlı değildir; oyun sürdüğü sürece devam eder.
-- Tekrar Oyna temiz oyun state'i ile başlar.
-- Ana Menü eski boruları temizler.
-- Ses açılıp kapatılabilir.
+## Oyun döngüsü ve performans
+- Tek `Choreographer.FrameCallback` kullanılır.
+- `frameCallbackPosted` + `isRunning` ile aynı callback'in birden fazla planlanması engellenir.
+- İlk frame delta'sı `0f`; sonraki delta değerleri `0..0.033s` aralığına clamp edilir.
+- `onPause()` callback'i durdurur; `onResume()` zaman tabanını sıfırlar.
+- Touch yalnızca `ACTION_DOWN` üzerinde flap üretir. `ACTION_MOVE`, `ACTION_UP` ve `ACTION_CANCEL` fiziği değiştirmez.
+- `onDraw()` yalnızca render eder; fizik, skor ve spawn `updateGame()` içindedir.
+- Bitmap decode, bird frame hazırlığı, shader, font ve ses buffer hazırlığı başlangıçta bir kez yapılır.
+- Frame içinde yeni `RectF`, `Path`, `Bitmap`, `Typeface` veya dosya/SharedPreferences erişimi yapılmaz.
+- Debug build'de her 600 frame'de ortalama FPS, maksimum frame aralığı, callback sayısı, aktif pipe sayısı, son spawn zamanı ve son spawn X değeri Logcat'e yazılır. Kullanıcıya görünür debug HUD yoktur.
+
+## Sonsuz engel sistemi
+`PipeSpawner` boruların tek sahibidir. Render ve touch listede değişiklik yapmaz.
+
+- Sabit `MAX_PIPES = 8` sınırı yoktur.
+- Borular fizik güncellemesinde hareket eder.
+- Ekran dışına çıkan borular temizlenir.
+- Sağdaki borunun konumuna göre en fazla bir yeni boru aynı fizik güncellemesinde eklenir.
+- Yeni boru sabit `PIPE_SPACING` mesafesiyle sağ tarafa planlanır.
+- Spawn skordan, touch'tan ve render'dan bağımsızdır.
+- Her boru benzersiz ID ve `passed` state'i taşır.
+- Oyun aktifken liste boş bırakılamaz; NaN/infinite X ve spacing ihlalleri invariant ile yakalanır.
+- Yeniden oynama `reset()` ile tamamen temiz state kurar; ana menü `clear()` ile obstacle state'ini kapatır.
+- İlk engeller kontrollü boşluklarla başlar, ilerleyen engellerde rastgelelik kademeli olarak devreye girer.
+
+## Ses ve haptic
+`ToneGenerator` kaldırıldı. `PremiumSoundEngine`, başlangıçta küçük PCM ses bankasını hazırlar ve oyun sırasında önceden oluşturulmuş `AudioTrack` nesnelerini yeniden kullanır.
+
+Ses bankası:
+- Menü butonu
+- Flap
+- Skor
+- Yeni rekor
+- Çarpışma
+- Oyun başlangıcı
+- Oyun sonu
+- Kısa UI tick
+
+Haptic cihaz destekliyorsa buton, skor geçişi ve çarpışmada kullanılır. Ses/haptic tercihleri korunur.
 
 ## Otomatik doğrulama
-`PipeSpawnerTest` aşağıdaki davranışları doğrular:
-- 8. engelden sonra üretimin devam etmesi.
-- 30'dan fazla engelin simülasyonda üretilmesi.
-- Aktif listenin sınırlı kalması.
-- Ardışık boru spacing değerinin sabit kalması.
-- NaN/infinite x değerlerinin oluşmaması.
+`PipeSpawnerTest` şunları doğrular:
+- 20'den fazla engelin üretilmesi.
+- Uzun simülasyonda 35+ engelin üretilmesi.
+- Aktif obstacle listesinin sınırlı kalması.
+- Ardışık boru spacing değerinin sabit olması.
+- NaN/infinite X oluşmaması.
+- Gelecekte bir borunun her zaman planlı olması.
 - Reset sonrasında tek ve temiz ilk borunun kurulması.
-- Tek fizik güncellemesinde burst spawn yapılmaması.
+- Tek fizik güncellemesinde birden fazla burst spawn yapılmaması.
 
-GitHub Actions, APK'dan önce `testDebugUnitTest` çalıştırır; ardından `clean assembleDebug` ve APK doğrulaması yapılır.
+GitHub Actions önce `testDebugUnitTest`, ardından `clean assembleDebug` çalıştırır ve APK ZIP bütünlüğünü doğrular.
 
-## Bilinen test durumu
-**Kod ve otomatik test:** PipeSpawner simülasyonu 5000 frame boyunca çalıştırıldığında 58'den fazla engel üretir ve aktif liste 3 civarında tutulur. Repository testinde 30+ üretim ve reset/spacing invariantları doğrulanır.
-
-**Frame/touch kod incelemesi:** tek callback guard, ilk-frame sıfır delta, 33 ms delta clamp, pause/resume sıfırlaması, yalnızca ACTION_DOWN flap, touch sırasında layout/state yeniden kurulmaması ve frame içi shader/font allocationlarının kaldırılması kontrol edildi.
-
-**Gerçek cihaz/emülatör:** Bu geliştirme ortamında Android cihaz/emülatör ve `adb` bulunmadığı için fiziksel kurulum ve 5 dakikalık gerçek oynanış testi yapılamadı. Bu nedenle gerçek cihaz FPS ölçümü veya dokunmatik spike ölçümü doğrulanmış kabul edilmez.
-
-**Performans hedefi:** 60 FPS. Render döngüsü tek callback üzerinden çalışır; bitmap decode ve ağır kaynak hazırlama frame dışındadır. Gerçek cihaz frame-time ölçümü yapılamamıştır.
+## Test durumu
+- **Otomatik spawn testi:** 3600 fizik frame'i ve 60 FPS sabit zaman adımıyla 35'ten fazla engel üretimi doğrulanır; liste bounded kalır.
+- **Uzun simülasyon:** Aynı mimari üzerinde 5000 frame'lik önceki v4 simülasyonunda 58+ engel gözlenmiştir. V5 testleri aynı invariantları daha sıkı şekilde doğrular.
+- **Frame/touch statik inceleme:** tek callback guard, delta clamp, pause/resume reset, yalnızca ACTION_DOWN flap, render/fizik ayrımı ve frame allocation azaltımı kontrol edilmiştir.
+- **Gerçek cihaz/emülatör:** Bu geliştirme ortamında Android cihaz/emülatör ve `adb` bulunmadığından fiziksel kurulum, gerçek 60 FPS ölçümü ve dokunma spike ölçümü yapılamamıştır.
 
 ## Teknoloji
 - Native Android / Kotlin
@@ -57,4 +80,4 @@ GitHub Actions, APK'dan önce `testDebugUnitTest` çalıştırır; ardından `cl
 - compileSdk / targetSdk 35, minSdk 23
 - Canvas + Choreographer
 - SharedPreferences
-- ToneGenerator
+- AudioTrack / PCM
